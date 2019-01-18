@@ -1,4 +1,7 @@
 # objective - create home folder
+#GIT TEST FROM NICK
+#grab_credentials
+. ".\getcreds.ps1"
 
 function get_folders($root) {
 	$arr = @()

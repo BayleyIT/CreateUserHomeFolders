@@ -1,4 +1,5 @@
 function GETCREDENTIALS() {
+    Write-Host("GETTING CREDENTIALS")
     $user= ""
     $pass= ""
     $secpasswd = ConvertTo-SecureString $pass -AsPlainText -Force
