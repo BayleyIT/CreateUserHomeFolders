@@ -1,8 +1,8 @@
 # objective - create home folder
 
-function get_folders() {
+function get_folders($root) {
 	$arr = @()
-	foreach($folder in (Get-ChildItem "\\fs1\d$\Home")) {
+	foreach($folder in (Get-ChildItem $root)) {
   	$arr += $folder.name
   }
 	return $arr
@@ -34,11 +34,11 @@ function findfoldertocreate($user_arr, $folders_arr) {
 # -----------------------------------------------------------------
 # -----------------------------------------------------------------
 
-
 function get_usernames() {
 		$user_arr = @()
     $cred = GETCREDENTIALS
     Connect-MsolService -Credential $cred
+    #Connect-MsolService
     $Userdata =  Get-MSOLUser | Where-Object { $_.isLicensed -eq "True"} | Select-Object DisplayName, UserPrincipalName, isLicensed 
     foreach ($user in $Userdata) {
         $email = $user.UserPrincipalName
@@ -54,30 +54,33 @@ function get_usernames() {
 # -----------------------------------------------------------------
 # -----------------------------------------------------------------
 # -----------------------------------------------------------------
-function secure_folder($path, $user, $top_or_bottom) {
-	$command = ""
-	if($top_or_bottom -eq "top") {
-  	$command = "icacls `"$path`" /grant $($user):(R)(NP)"
-  }
-	if($top_or_bottom -eq "bottom") {
-  	$command = "icacls `"$path`" /grant $($user):(F)"
-  }
-  cmd.exe /c $command
-}
-function create_folders($arr) {
-	$root_path2 = "C:\users\a_navi\desktop\test"
-    foreach ($user in $arr) {
-        Write-Host ($user)
-        if (Test-Path -path $root_path2) {
-          New-Item -Itemtype directory -path "$root_path2\$user"
-          secure_folder -path "$root_path2\$user" -user $user -top_or_bottom "top"
-          New-Item -Itemtype directory -path "$root_path2\$user\Emails Archives"
-          secure_folder -path "$root_path2\$user\Emails Archives" -user $user -top_or_bottom "top"
-          New-Item -Itemtype directory -path "$root_path2\$user\Scans"
-          secure_folder -path "$root_path2\$user" -user $user -top_or_bottom "top"
-          New-Item -Itemtype directory -path "$root_path2\$user\Files"
-          secure_folder -path "$root_path2\$user\Files" -user $user -top_or_bottom "top"
+function create_and_secure_folder($path, $user, $root_or_sub) {
+    Write-Host ("Current processing: $user")
+    New-Item -Itemtype directory -path $path
+    $cur_cmd = ""
+    if(Test-Path -path $path) {
+        Write-Host("Created: $path")
+        if($root_or_sub -eq "root") {   $cur_cmd = "icacls $($path) /grant $($user)@bayley.net:(R)" }
+        if($root_or_sub -eq "sub") {    $cur_cmd = "icacls `"$path`" /grant $($user)@bayley.net:(CI)(OI)(RC,WDAC,WO,S,AS,RD,WD,AD,REA,WEA,X,DC,RA,WA) /T /C" }
     }
+    else {
+        "FAILED TO CREATE: $path"
+    }
+    cmd.exe /C "$($cur_cmd)"
+    Write-Host $cur_cmd
+}
+
+function create_folders($arr, $root) {
+    foreach ($user in $arr) {
+        $head = "$root\$user"
+        $email_archive_path = "$head\Email Archives"
+        $files_path = "$head\Files"
+        $scans = "$head\Scans"
+        create_and_secure_folder -path $head -user $user -root_or_sub "root"
+
+        create_and_secure_folder -path $email_archive_path -user $user -root_or_sub "sub"
+        create_and_secure_folder -path $files_path -user $user -root_or_sub "sub"
+        create_and_secure_folder -path $scans -user $user -root_or_sub "sub"
 	}
 }
 
@@ -87,15 +90,15 @@ function create_folders($arr) {
 # -----------------------------------------------------------------
 
 function main($root) {
-	#get user names
-  Write-Host("Here1")
-	$user_arr = get_usernames
-  $folders_arr = get_folders
-  $folders_to_create = findfoldertocreate -user_arr $user_arr -folders_arr $folders_arr
-  create_folders -arr $folders_to_create
+    #get user names
+    $user_arr = get_usernames
+    $folders_arr = get_folders -root $root
+    $folders_to_create = findfoldertocreate -user_arr $user_arr -folders_arr $folders_arr
+    create_folders -arr $folders_to_create -root $root
 }
 
-$ROOT_HOME_FOLDER = "\\fs1\home"
+# $ROOT_HOME_FOLDER = "\\fs1\home"
+$ROOT_HOME_FOLDER = "\\fs1\Home"
 main -root $ROOT_HOME_FOLDER
 
 
